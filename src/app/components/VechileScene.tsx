@@ -1,7 +1,7 @@
 "use client";
 import React, { useState, useRef, useEffect } from "react";
 import { motion, useAnimation, useInView } from "framer-motion";
-import { Button } from "@/components/ui/button";
+
 import { cn } from "@/lib/utils";
 import { Pause, Play } from "lucide-react";
 import Image from "next/image";
@@ -40,13 +40,21 @@ export default function VechileScene() {
     setActiveStep(newIndex);
   };
 
-  const togglePlayback = () => {
-    if (isPlaying) {
-      videoRef1.current?.pause();
-    } else {
-      videoRef1.current?.play();
+  const togglePlayback = async () => {
+    const video = videoRef1.current;
+    if (!video) return;
+
+    try {
+      if (isPlaying) {
+        await video.pause();
+        setIsPlaying(false);
+      } else {
+        await video.play();
+        setIsPlaying(true);
+      }
+    } catch (error) {
+      console.error("Video playback error:", error);
     }
-    setIsPlaying(!isPlaying);
   };
 
   useEffect(() => {
@@ -55,12 +63,21 @@ export default function VechileScene() {
   }, []);
 
   useEffect(() => {
-    if (videoRef1.current) {
-      videoRef1.current.load();
-      if (isPlaying) {
-        videoRef1.current.play();
+    const video = videoRef1.current;
+    if (!video) return;
+
+    const handleVideoLoad = async () => {
+      try {
+        video.load();
+        if (isPlaying) {
+          await video.play();
+        }
+      } catch (error) {
+        console.error("Video load error:", error);
       }
-    }
+    };
+
+    handleVideoLoad();
   }, [activeStep]);
 
   useEffect(() => {
@@ -69,7 +86,7 @@ export default function VechileScene() {
       stepperControls.start({ y: 0, opacity: 1 });
       videoControls.start({ y: 0, opacity: 1 });
     }
-  }, [isInView, activeStep]);
+  }, [isInView]);
 
   useEffect(() => {
     const video = videoRef1.current;
@@ -81,9 +98,19 @@ export default function VechileScene() {
       setProgress(current / duration);
     };
 
+    const handlePlay = () => setIsPlaying(true);
+    const handlePause = () => setIsPlaying(false);
+
     video.addEventListener("timeupdate", updateProgress);
-    return () => video.removeEventListener("timeupdate", updateProgress);
-  }, [videoRef1]);
+    video.addEventListener("play", handlePlay);
+    video.addEventListener("pause", handlePause);
+
+    return () => {
+      video.removeEventListener("timeupdate", updateProgress);
+      video.removeEventListener("play", handlePlay);
+      video.removeEventListener("pause", handlePause);
+    };
+  }, [activeStep]);
 
   const radius = 18;
   const circumference = 2 * Math.PI * radius;
@@ -173,8 +200,8 @@ export default function VechileScene() {
               loop
               muted
               autoPlay
-              height={500}
-              width={500}
+              playsInline
+              preload="metadata"
             />
 
             <div className="absolute right-4 sm:right-10 md:right-20 flex flex-col sm:flex-row gap-10 sm:gap-20 -bottom-28 sm:bottom-[-5rem] items-center">
@@ -186,9 +213,10 @@ export default function VechileScene() {
                 className="rounded-lg shadow-lg w-44 sm:w-60 md:w-80 h-auto"
               />
 
-              <div className="relative group w-8 h-8 sm: mt sm:w-12 sm:h-12 md:w-16 md:h-16 lg:w-20 lg:h-20">
+              <div className="relative group w-8 h-8 sm:w-12 sm:h-12 md:w-16 md:h-16 lg:w-20 lg:h-20">
+              
                 <svg
-                  className="absolute inset-0 w-full h-full -mt-8 lg:mt-0 sm:mt-0 md:mt-0 transform -rotate-90"
+                  className="absolute inset-0 w-full sm:mt-0 md:mt-0 -mt-8 lg:mt-0 h-full transform -rotate-90"
                   viewBox="0 0 40 40"
                 >
                   <circle
@@ -217,20 +245,20 @@ export default function VechileScene() {
                   />
                 </svg>
 
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="absolute inset-0 -mt-8 lg:mt-0 sm:mt-0 md:mt-0 w-full h-full rounded-full bg-transparent hover:bg-white/10 text-white border-0 transition-all duration-200 group-hover:scale-105"
+              
+                <button
                   onClick={togglePlayback}
+                  className="absolute inset-0 w-full -mt-8 lg:mt-0 md:mt-0 sm:mt-0 h-full rounded-full bg-transparent hover:bg-white/10 text-white border-0 transition-all duration-200 group-hover:scale-105 flex items-center justify-center cursor-pointer z-10"
+                  aria-label={isPlaying ? "Pause video" : "Play video"}
                 >
                   {isPlaying ? (
                     <Pause size={16} className="drop-shadow-sm" />
                   ) : (
                     <Play size={16} className="ml-0.5 drop-shadow-sm" />
                   )}
-                </Button>
+                </button>
 
-                <div className="absolute inset-0 rounded-full bg-white/5 opacity-0 group-hover:opacity-100 transition-opacity duration-200" />
+                <div className="absolute inset-0 rounded-full bg-white/5 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none" />
               </div>
             </div>
           </motion.div>
